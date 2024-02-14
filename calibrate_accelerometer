@@ -1,0 +1,141 @@
+# Accelerometer calibration
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as font_manager
+#%matplotlib inline
+
+path = "C:\\Users\\ai739\\22\\INTP\\codes\\raw_xyz\\23-3-23\\"
+g = 9.81
+font = font_manager.FontProperties(size=8)
+
+# --- --- --- ACLN
+rd = pd.read_excel(path + 'all_acc_23-3-23.xlsx')
+rd_xi = pd.read_excel(path + 'x_in_23-3-23.xlsx')
+rd_xo = pd.read_excel(path + 'x_out_23-3-23.xlsx')
+rd_yi = pd.read_excel(path + 'y_in_23-3-23.xlsx')
+rd_yo = pd.read_excel(path + 'y_out_23-3-23.xlsx')
+rd_zi = pd.read_excel(path + 'z_in_23-3-23.xlsx')
+rd_zo = pd.read_excel(path + 'z_out_23-3-23.xlsx')
+
+rd_xi = rd_xi[51:351]
+rd_xo = rd_xo[51:351]
+rd_yi = rd_yi[51:351]
+rd_yo = rd_yo[51:351]
+rd_zi = rd_zi[51:351]
+rd_zo = rd_zo[51:351]
+#rd_zo = rd_zo.to_numpy()
+
+N = len(rd)
+fs=100
+tT = N/fs
+t1 = np.linspace(0,tT,N)
+
+fig1, ax1 = plt.subplots()
+fig1 = plt.figure(figsize=(6,8))
+ax1.cla()
+ax1.plot(t1,rd.IMU_accX,'r-')
+ax1.plot(t1,rd.IMU_accY,'g-')
+ax1.plot(t1,rd.IMU_accZ,'b-')
+ax1.grid()
+ax1.set_xlabel('time (s)')
+ax1.set_ylabel('g $(m/s^{2})$')
+ax1.set_title('Raw accelerometer data')
+ax1.legend(['aX (raw)','aY (raw)','aZ (raw)'],loc=4,prop=font)
+fig1.show()
+
+# X_minus
+X1 = np.matrix([[np.mean(rd_xi.IMU_accX), np.mean(rd_xi.IMU_accY), np.mean(rd_xi.IMU_accZ)],
+      [np.mean(rd_yi.IMU_accX), np.mean(rd_yi.IMU_accY), np.mean(rd_yi.IMU_accZ)],
+      [np.mean(rd_zi.IMU_accX), np.mean(rd_zi.IMU_accY), np.mean(rd_zi.IMU_accZ)]])
+# X_plus
+X2 = np.matrix([[np.mean(rd_xo.IMU_accX), np.mean(rd_xo.IMU_accY), np.mean(rd_xo.IMU_accZ)],
+      [np.mean(rd_yo.IMU_accX), np.mean(rd_yo.IMU_accY), np.mean(rd_yo.IMU_accZ)],
+      [np.mean(rd_zo.IMU_accX), np.mean(rd_zo.IMU_accY), np.mean(rd_zo.IMU_accZ)]])
+
+O = np.multiply((X1+X2),0.5*np.ones((3,3)))
+A = np.multiply( np.linalg.inv(X2-X1) , 2*np.ones((3,3)) )
+o = np.diag(O)
+o = o.reshape((3,1))
+
+k = A*(X2-O)
+print("\nCheck X_plus:\n",k)  # should be Identity matrix
+k = -A*(X1-O)
+print("\nCheck X_minus:\n",k) # should be Identity matrix
+del k
+
+ca = np.ones((N,3))
+
+rdn = rd.to_numpy()
+#calibrated values
+for i in range(0,N):
+    kk = rdn[i,:]
+    kk = kk.reshape((3,1))
+    kk2 = np.linalg.inv(A)*(kk-o)
+    ca[i,:] = kk2.transpose()
+  
+del kk
+del kk2
+
+fig2, ax2 = plt.subplots()
+fig2 = plt.figure(figsize=(6,8))
+ax2.cla()
+ax2.plot(t1,ca[:,0],'r-')
+ax2.plot(t1,ca[:,1],'g-')
+ax2.plot(t1,ca[:,2],'b-')
+ax2.grid()
+ax2.set_xlabel('time (s)')
+ax2.set_ylabel('g $(m/s^{2})$')
+ax2.set_title('Calibrated accelerometer data')
+ax2.legend(['aX (cal)','aY (cal)','aZ (cal)'],loc=4,prop=font)
+fig2.show()
+
+fig3, ax3 = plt.subplots(3)
+#fig3 = plt.figure(figsize=(6,8))
+ax3[0].plot(t1,rd.IMU_accX,'b-')
+ax3[0].plot(t1,ca[:,0],'r-')
+ax3[1].plot(t1,rd.IMU_accY,'b-')
+ax3[1].plot(t1,ca[:,1],'r-')
+ax3[2].plot(t1,rd.IMU_accZ,'b-')
+ax3[2].plot(t1,ca[:,2],'r-')
+ax3[0].grid()
+ax3[1].grid()
+ax3[2].grid()
+# ============================================================================
+# ax3.set_xlabel('time (s)')
+# ax3.set_ylabel('g (m/s^2)')
+ax3[0].set_title('accelerometer data')
+ax3[0].legend(['Raw','Calibrated'],loc=4,prop=font)
+# ============================================================================
+fig3.show()
+
+fig4, ax4 = plt.subplots()
+ax4.scatter(rd.IMU_accX, rd.IMU_accY,color='b')
+ax4.scatter(ca[:,0],ca[:,1],color='r')
+ax4.grid()
+ax4.legend(['Raw','Calibrated'])
+ax4.set_xlabel('X (g $(m/s^{2})$)')
+ax4.set_ylabel('Y (g $(m/s^{2})$)')
+ax4.set_title('Raw and calibrated accelerometer data (X-Y)')
+fig4.show()
+
+fig5, ax5 = plt.subplots()
+ax5.scatter(rd.IMU_accY, rd.IMU_accZ,color='b')
+ax5.scatter(ca[:,1],ca[:,2],color='r')
+ax5.grid()
+ax5.legend(['Raw','Calibrated'])
+ax5.set_xlabel('Y (g $(m/s^{2})$)')
+ax5.set_ylabel('Z (g $(m/s^{2})$)')
+ax5.set_title('Raw and calibrated accelerometer data (Y-Z)')
+fig5.show()
+
+fig6, ax6 = plt.subplots()
+ax6.scatter(rd.IMU_accZ, rd.IMU_accX,color='b')
+ax6.scatter(ca[:,2],ca[:,0],color='r')
+ax6.grid()
+ax6.legend(['Raw','Calibrated'])
+ax6.set_xlabel('Z (g $(m/s^{2})$)')
+ax6.set_ylabel('X (g $(m/s^{2})$)')
+ax6.set_title('Raw and calibrated accelerometer data (Z-X)')
+fig6.show()
